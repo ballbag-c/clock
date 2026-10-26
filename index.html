@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Clock">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}[hidden]{display:none!important}</style>
+<title>Bedside Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@600;700;800&display=swap">
+<style>
+/* Layout: one dark screen. Sun or moon above giant rounded digits, one friendly line below.
+   Settings sit behind a hold-to-open gear so little fingers can't change them. */
+:root{
+  color-scheme: dark;
+  --night:#000000;
+  --panel:#15171E;
+  --field:#0D0F14;
+  --line:#2A2D38;
+  --paper:#F2EADB;
+  --muted:#8F897E;
+  --amber:#FFB04A;
+  --ember:#FF5A36;
+  --leaf:#7FE07C;
+  --sun:#FFD54F;
+  --moon:#EDE4C8;
+  --display:"Fredoka","Nunito","Avenir Next","Trebuchet MS",sans-serif;
+  --body:"Nunito","Avenir Next","Helvetica Neue",Arial,sans-serif;
+  --c:var(--paper);
+  --dim:.25;
+}
+html,body{height:100%}
+body{
+  margin:0;box-sizing:border-box;overflow:hidden;
+  background:var(--night);color:var(--paper);font-family:var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+}
+body.m-day{--c:var(--paper)}
+body.m-wind{--c:var(--amber)}
+body.m-sleep{--c:var(--ember)}
+body.m-wake{--c:var(--leaf)}
+
+.glow{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;opacity:0;transition:opacity 3s ease}
+.glow.g-wake{background:radial-gradient(ellipse at 50% 42%,rgba(127,224,124,.20),rgba(127,224,124,0) 62%)}
+.glow.g-wind{background:radial-gradient(ellipse at 50% 42%,rgba(255,176,74,.10),rgba(255,176,74,0) 60%)}
+body.m-wake .g-wake{opacity:1}
+body.m-wind .g-wind{opacity:1}
+
+.stage{
+  position:relative;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:transform 1.5s ease,opacity 2s ease;
+}
+.stage>*{margin:1.1vh 0}
+body.m-sleep .stage{opacity:var(--dim)}
+
+.icon{width:16vw;height:16vw;width:min(17vw,19vh);height:min(17vw,19vh);display:none}
+.icon svg{width:100%;height:100%;display:block;overflow:visible}
+body.m-wind .icon,body.m-sleep .icon,body.m-wake .icon{display:block}
+.sun,.moon{display:none}
+body.m-wake .sun{display:inline}
+body.m-wind .moon,body.m-sleep .moon{display:inline}
+.moon-face{fill:var(--moon)}
+body.m-sleep .moon-face,body.m-sleep .star{fill:var(--ember)}
+body.m-wind .moon-face,body.m-wind .star{fill:var(--amber)}
+.sun-core{fill:var(--sun)}
+.rays{stroke:var(--sun);stroke-width:6;stroke-linecap:round;transform-origin:50px 50px;animation:spin 60s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.clock{
+  font-family:var(--display);font-weight:500;color:var(--c);
+  font-size:26vw;font-size:min(26vw,48vh);line-height:.92;
+  display:flex;align-items:center;transition:color 3s ease;
+}
+.clock .d{display:inline-block;width:.58em;text-align:center}
+.clock .colon{display:inline-block;width:.26em;text-align:center;position:relative;top:-.06em}
+.clock .ampm{font-size:.26em;font-weight:600;align-self:flex-end;margin:0 0 .16em .12em;opacity:.85}
+
+.label{
+  font-family:var(--display);font-weight:600;color:var(--c);text-align:center;
+  font-size:7vw;font-size:min(7vw,8.5vh);line-height:1.1;transition:color 3s ease;
+}
+.sub{
+  font-weight:700;color:var(--c);opacity:.55;text-align:center;letter-spacing:.02em;
+  font-size:4.2vw;font-size:min(4.2vw,5vh);transition:color 3s ease;
+}
+.sub:empty{display:none}
+
+/* Hold-to-open gear */
+.gear{
+  position:fixed;width:52px;height:52px;border:0;padding:0;background:none;cursor:pointer;
+  right:calc(10px + env(safe-area-inset-right,0px));
+  bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  opacity:.22;color:var(--muted);touch-action:none;
+}
+.gear:focus-visible{outline:2px solid var(--muted);outline-offset:2px;opacity:.8}
+.gear svg{width:100%;height:100%;display:block}
+.gear .ring{fill:none;stroke:var(--paper);stroke-width:3;stroke-dasharray:139;stroke-dashoffset:139;transform:rotate(-90deg);transform-origin:26px 26px;transition:stroke-dashoffset .2s ease}
+.gear.holding{opacity:.9}
+.gear.holding .ring{stroke-dashoffset:0;transition:stroke-dashoffset .9s linear}
+
+/* Settings sheet */
+.sheet{
+  position:fixed;top:0;right:0;bottom:0;left:0;z-index:20;
+  background:rgba(0,0,0,.72);overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  -webkit-user-select:auto;user-select:auto;
+}
+.card{
+  max-width:440px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:18px;padding:20px 18px;display:flex;flex-direction:column;
+}
+.card>*{margin:0 0 18px}
+.card>*:last-child{margin-bottom:0}
+.card h2{margin:0 0 18px;font-family:var(--display);font-weight:600;font-size:24px;color:var(--paper)}
+.card .note{margin:-10px 0 18px;color:var(--muted);font-size:14px;line-height:1.45}
+.group{display:flex;flex-direction:column}
+.group>*{margin:0 0 10px}
+.group>*:last-child{margin-bottom:0}
+.group h3{margin:0 0 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.row>label,.row>span{margin:4px 12px 4px 0}
+.row label{font-size:16px;font-weight:700;color:var(--paper);min-width:0;flex:1 1 160px}
+input[type=time],select{
+  font:inherit;font-weight:700;font-size:16px;color:var(--paper);background:var(--field);
+  border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:42px;box-sizing:border-box;
+}
+input[type=time]{min-width:120px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
+.range{display:flex;align-items:center;flex:1 1 180px}
+.range output{margin-left:10px}
+.range input{flex:1;accent-color:var(--ember)}
+.range output{min-width:3.2em;text-align:right;font-weight:800;color:var(--ember);font-variant-numeric:tabular-nums}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg label{flex:none;padding:9px 14px;font-size:15px;font-weight:800;color:var(--muted);cursor:pointer;background:var(--field)}
+.seg input:checked+label{background:var(--paper);color:#111}
+.seg input:focus-visible+label{outline:2px solid var(--leaf);outline-offset:-2px}
+.previews{display:flex;flex-wrap:wrap;margin-bottom:-8px}
+.previews button{margin:0 8px 8px 0}
+.previews button{
+  font:inherit;font-weight:800;font-size:14px;padding:9px 12px;border-radius:999px;cursor:pointer;
+  background:var(--field);border:1px solid var(--line);color:var(--paper);
+}
+.previews button[data-m=wake]{color:var(--leaf)}
+.previews button[data-m=wind]{color:var(--amber)}
+.previews button[data-m=sleep]{color:var(--ember)}
+.previews button.on{border-color:currentColor}
+.done{
+  font:inherit;font-weight:800;font-size:17px;padding:13px;border-radius:12px;border:0;cursor:pointer;
+  background:var(--leaf);color:#0C1A0C;
+}
+.tips{margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.5}
+
+@media (prefers-reduced-motion:reduce){
+  .rays{animation:none}
+  .stage,.glow,.clock,.label,.sub{transition:none}
+}
+</style>
+
+</head>
+<body>
+<div class="glow g-wake"></div>
+<div class="glow g-wind"></div>
+
+<main class="stage" id="stage">
+  <div class="icon" aria-hidden="true">
+    <svg viewBox="0 0 100 100">
+      <defs>
+        <mask id="crescent">
+          <rect x="0" y="0" width="100" height="100" fill="#fff"/>
+          <circle cx="66" cy="38" r="30" fill="#000"/>
+        </mask>
+      </defs>
+      <g class="moon">
+        <circle class="moon-face" cx="48" cy="54" r="34" mask="url(#crescent)"/>
+        <circle class="star moon-face" cx="82" cy="70" r="3.5"/>
+        <circle class="star moon-face" cx="74" cy="88" r="2.2"/>
+      </g>
+      <g class="sun">
+        <g class="rays">
+          <line x1="50" y1="6" x2="50" y2="17"/><line x1="50" y1="83" x2="50" y2="94"/>
+          <line x1="6" y1="50" x2="17" y2="50"/><line x1="83" y1="50" x2="94" y2="50"/>
+          <line x1="19" y1="19" x2="27" y2="27"/><line x1="73" y1="73" x2="81" y2="81"/>
+          <line x1="81" y1="19" x2="73" y2="27"/><line x1="19" y1="81" x2="27" y2="73"/>
+        </g>
+        <circle class="sun-core" cx="50" cy="50" r="23"/>
+      </g>
+    </svg>
+  </div>
+  <div class="clock" id="clock" role="timer" aria-live="off">7:00</div>
+  <div class="label" id="label">Sunday</div>
+  <div class="sub" id="sub"></div>
+</main>
+
+<button class="gear" id="gear" type="button" aria-label="Settings (hold for a second)">
+  <svg viewBox="0 0 52 52" aria-hidden="true">
+    <circle class="ring" cx="26" cy="26" r="22"/>
+    <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <circle cx="26" cy="26" r="5"/>
+      <path d="M26 14v4M26 34v4M14 26h4M34 26h4M17.5 17.5l2.8 2.8M31.7 31.7l2.8 2.8M34.5 17.5l-2.8 2.8M20.3 31.7l-2.8 2.8"/>
+    </g>
+  </svg>
+</button>
+
+<div class="sheet" id="sheet" hidden>
+  <form class="card" id="form" autocomplete="off">
+    <h2>Clock settings</h2>
+    <p class="note">Hold the faint gear in the corner for a second to get back here.</p>
+
+    <div class="group">
+      <h3>Times</h3>
+      <div class="row"><label for="f-bed">Bedtime</label><input type="time" id="f-bed"></div>
+      <div class="row"><label for="f-wwk">Wake-up, school days</label><input type="time" id="f-wwk"></div>
+      <div class="row"><label for="f-wwe">Wake-up, weekends</label><input type="time" id="f-wwe"></div>
+    </div>
+
+    <div class="group">
+      <h3>Lights</h3>
+      <div class="row"><label for="f-glow">Green "get up" light lasts</label>
+        <select id="f-glow">
+          <option value="15">15 min</option><option value="30">30 min</option>
+          <option value="60">1 hour</option><option value="90">1½ hours</option><option value="120">2 hours</option>
+        </select>
+      </div>
+      <div class="row"><label for="f-wind">"Bedtime soon" warning</label>
+        <select id="f-wind">
+          <option value="0">Off</option><option value="15">15 min before</option>
+          <option value="30">30 min before</option><option value="45">45 min before</option><option value="60">1 hour before</option>
+        </select>
+      </div>
+      <div class="row"><label for="f-dim">Night brightness</label>
+        <div class="range"><input type="range" id="f-dim" min="5" max="70" step="5"><output id="o-dim" for="f-dim">25%</output></div>
+      </div>
+      <div class="row"><span style="font-size:16px;font-weight:700;flex:1 1 160px">Clock style</span>
+        <div class="seg" role="radiogroup" aria-label="Clock style">
+          <input type="radio" name="h" id="f-h12" value="12"><label for="f-h12">7:30</label>
+          <input type="radio" name="h" id="f-h24" value="24"><label for="f-h24">19:30</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Preview</h3>
+      <p class="note" style="margin:0 0 10px">Shows each look for 6 seconds, then comes back here.</p>
+      <div class="previews" id="previews">
+        <button type="button" data-m="day">Daytime</button>
+        <button type="button" data-m="wind">Bedtime soon</button>
+        <button type="button" data-m="sleep">Sleepy time</button>
+        <button type="button" data-m="wake">Get up</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>On the iPad</h3>
+      <ul class="tips">
+        <li>Display &amp; Brightness › Auto-Lock › Never</li>
+        <li>Do Not Disturb on, so nothing pings</li>
+        <li>General › Accessibility › Guided Access locks it to this screen (triple-click Home)</li>
+      </ul>
+    </div>
+
+    <button type="submit" class="done" id="done">Done</button>
+  </form>
+</div>
+
+<script>
+(function(){
+  var DEF={bed:"19:30",wakeWk:"07:15",wakeWe:"07:30",glow:60,wind:30,dim:25,h24:false};
+  var KEY="bedside-clock-v1";
+  var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var S=load(), preview=null, lastKey="", lastMin=-1;
+
+  var $=function(id){return document.getElementById(id)};
+  var stage=$("stage"), clock=$("clock"), label=$("label"), sub=$("sub");
+
+  function load(){
+    var o={};
+    try{var r=localStorage.getItem(KEY); if(r) o=JSON.parse(r)||{};}catch(e){}
+    var s={}; for(var k in DEF){ s[k]=(o[k]!==undefined)?o[k]:DEF[k]; } return s;
+  }
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){} }
+  function mins(t){ var p=String(t||"0:0").split(":"); return (+p[0])*60+(+p[1]||0); }
+  function ap(m){ return S.h24 ? "" : (Math.floor(m/60)%24<12 ? "am" : "pm"); }
+  function fmtA(m){ var a=ap(m); return fmt(m)+(a?" "+a:""); }
+  function fmt(m){
+    var h=Math.floor(m/60)%24, mi=m%60;
+    if(!S.h24){ h=h%12; if(h===0) h=12; }
+    return (S.h24&&h<10?"0":"")+h+":"+(mi<10?"0":"")+mi;
+  }
+  function wakeFor(day){ return mins(day===0||day===6 ? S.wakeWe : S.wakeWk); }
+
+  function modeAt(now){
+    var day=now.getDay(), m=now.getHours()*60+now.getMinutes();
+    var wake=wakeFor(day), bed=mins(S.bed), glow=+S.glow, wind=+S.wind;
+    if(m>=wake && m<wake+glow) return "wake";
+    if(m>=bed || m<wake) return "sleep";
+    if(wind>0 && m>=bed-wind) return "wind";
+    return "day";
+  }
+
+  function digits(str){
+    var out="";
+    for(var i=0;i<str.length;i++){
+      var c=str.charAt(i);
+      out+= c===":" ? '<span class="colon">:</span>' : '<span class="d">'+c+'</span>';
+    }
+    return out;
+  }
+
+  function render(force){
+    var now=new Date(), m=now.getHours()*60+now.getMinutes();
+    var mode=preview||modeAt(now), t=fmt(m);
+    var l, s;
+    if(mode==="sleep"){
+      var nextWake = (m>=mins(S.bed) && !preview) ? wakeFor((now.getDay()+1)%7) : wakeFor(now.getDay());
+      l="Sleepy time"; s="Stay in bed until "+fmtA(nextWake);
+    }else if(mode==="wind"){
+      l="Bedtime soon"; s="Lights out at "+fmtA(mins(S.bed));
+    }else if(mode==="wake"){
+      l="Good morning!"; s="You can get up now";
+    }else{
+      l=DAYS[now.getDay()]; s=now.getDate()+" "+MONTHS[now.getMonth()];
+    }
+    var key=t+"|"+mode+"|"+l+"|"+s+"|"+S.dim;
+    if(!force && key===lastKey) return;
+    lastKey=key;
+    document.body.className="m-"+mode;
+    document.body.style.setProperty("--dim",(+S.dim)/100);
+    var a=ap(m);
+    clock.innerHTML=digits(t)+(a?'<span class="ampm">'+a+'</span>':"");
+    clock.setAttribute("aria-label",fmtA(m));
+    label.textContent=l; sub.textContent=s;
+    if(m!==lastMin){ lastMin=m; nudge(); }
+  }
+
+  // Shift the whole face a few pixels each minute so nothing burns in.
+  function nudge(){
+    var dx=Math.round(Math.random()*12-6), dy=Math.round(Math.random()*12-6);
+    stage.style.transform="translate("+dx+"px,"+dy+"px)";
+  }
+
+  // Keep the screen on where the browser allows it.
+  var lock=null;
+  function wake(){
+    try{
+      if(navigator.wakeLock && !lock){
+        navigator.wakeLock.request("screen").then(function(l){
+          lock=l; l.addEventListener("release",function(){lock=null;});
+        }).catch(function(){});
+      }
+    }catch(e){}
+  }
+  document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible") wake(); });
+  document.addEventListener("click",wake);
+  document.addEventListener("touchend",wake);
+
+  // Hold-to-open gear
+  var gear=$("gear"), sheet=$("sheet"), holdT=null;
+  function holdStart(e){ if(e.cancelable) e.preventDefault(); gear.classList.add("holding"); clearTimeout(holdT); holdT=setTimeout(openSheet,900); }
+  function holdEnd(){ gear.classList.remove("holding"); clearTimeout(holdT); }
+  if(window.PointerEvent){
+    gear.addEventListener("pointerdown",holdStart);
+    gear.addEventListener("pointerup",holdEnd);
+    gear.addEventListener("pointercancel",holdEnd);
+    gear.addEventListener("pointerleave",holdEnd);
+  }else{
+    gear.addEventListener("touchstart",holdStart);
+    gear.addEventListener("touchend",holdEnd);
+    gear.addEventListener("touchcancel",holdEnd);
+    gear.addEventListener("mousedown",holdStart);
+    gear.addEventListener("mouseup",holdEnd);
+  }
+  gear.addEventListener("contextmenu",function(e){e.preventDefault();});
+  gear.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openSheet(); } });
+
+  var f={bed:$("f-bed"),wwk:$("f-wwk"),wwe:$("f-wwe"),glow:$("f-glow"),wind:$("f-wind"),dim:$("f-dim"),h12:$("f-h12"),h24:$("f-h24")};
+  function fill(){
+    f.bed.value=S.bed; f.wwk.value=S.wakeWk; f.wwe.value=S.wakeWe;
+    f.glow.value=String(S.glow); f.wind.value=String(S.wind); f.dim.value=S.dim;
+    $("o-dim").textContent=S.dim+"%";
+    f.h12.checked=!S.h24; f.h24.checked=!!S.h24;
+  }
+  function openSheet(){ holdEnd(); fill(); sheet.hidden=false; }
+  function closeSheet(){ sheet.hidden=true; setPreview(null); render(true); }
+
+  function onChange(){
+    if(f.bed.value) S.bed=f.bed.value;
+    if(f.wwk.value) S.wakeWk=f.wwk.value;
+    if(f.wwe.value) S.wakeWe=f.wwe.value;
+    S.glow=+f.glow.value; S.wind=+f.wind.value; S.dim=+f.dim.value;
+    S.h24=f.h24.checked;
+    $("o-dim").textContent=S.dim+"%";
+    save(); render(true);
+  }
+  ["bed","wwk","wwe","glow","wind","h12","h24"].forEach(function(k){ f[k].addEventListener("change",onChange); });
+  f.dim.addEventListener("input",onChange);
+
+  var pv=$("previews").getElementsByTagName("button"), pT=null, pAt=0;
+  function setPreview(m){
+    preview=m; clearTimeout(pT);
+    if(m){
+      pAt=Date.now(); sheet.hidden=true;
+      pT=setTimeout(endPreview,6000);
+    }
+    render(true);
+  }
+  function endPreview(){ if(!preview) return; preview=null; clearTimeout(pT); sheet.hidden=false; render(true); }
+  for(var i=0;i<pv.length;i++){
+    pv[i].addEventListener("click",function(){ setPreview(this.getAttribute("data-m")); });
+  }
+  document.addEventListener("click",function(){ if(preview && Date.now()-pAt>400) endPreview(); });
+  $("form").addEventListener("submit",function(e){ e.preventDefault(); closeSheet(); });
+
+  render(true);
+  setInterval(render,1000);
+})();
+</script>
+
+</body>
+</html>
